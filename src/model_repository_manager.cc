@@ -32,6 +32,7 @@
 #include <future>
 #include <stdexcept>
 #include <thread>
+#include <google/protobuf/util/message_differencer.h>
 #include "constants.h"
 #include "ensemble_utils.h"
 #include "filesystem.h"
@@ -613,6 +614,7 @@ ModelRepositoryManager::LoadUnloadModels(
   *all_models_polled = true;
   // Update ModelInfo related to file system accordingly
   std::set<std::string> added, deleted, modified, unmodified;
+  bool short_circuit_loading = false;
   {
     if (type == ActionType::UNLOAD) {
       for (const auto& model : models) {
@@ -672,46 +674,129 @@ ModelRepositoryManager::LoadUnloadModels(
       for (const auto& model_name : modified) {
         auto nitr = new_infos.find(model_name);
         auto itr = infos_.find(model_name);
+
+        //KMTODO: This model has been modified and needs to be checked if 
+        // we can short circuit the models loading in some way. For now,
+        // just check if the model instances have changed in the model configuration.
+        // Still swap out the old config with the new config, just store the diff info for 
+        // any logic we want to skip down the road.
+        //
+        //using ModelInfoMap = std::unordered_map<std::string, std::unique_ptr<ModelInfo>>;
+        // 
+        inference::ModelConfig diff = inference::ModelConfig();
+        // If model is an ensemble model, then we are not allowed multiple instances. Do the full model load for 
+        // in this case to get the correct error.
+        short_circuit_loading = ComputeModelConfigDiff(itr->second->model_config_, nitr->second->model_config_, diff); 
+
         itr->second = std::move(nitr->second);
       }
     }
   }
-  std::set<std::string> deleted_dependents;
+  // KMTODO: This is where we will check the bitmap for each model 
+  // and determine whether to take any short cuts for model loading.
+  if (!short_circuit_loading) {
+    // Update dependency graph and load
+    UpdateDependencyGraph(
+        added, deleted, modified,
+        unload_dependents ? &deleted_dependents : nullptr);
 
-  // Update dependency graph and load
-  UpdateDependencyGraph(
-      added, deleted, modified,
-      unload_dependents ? &deleted_dependents : nullptr);
+    // The models are in 'deleted' either when they are asked to be unloaded or
+    // they are not found / are duplicated across all model repositories.
+    // In all cases, should unload them and remove from 'infos_' explicitly.
+    for (const auto& name :
+         (unload_dependents ? deleted_dependents : deleted)) {
+      new_infos.erase(name);
+    }
 
-  // The models are in 'deleted' either when they are asked to be unloaded or
-  // they are not found / are duplicated across all model repositories.
-  // In all cases, should unload them and remove from 'infos_' explicitly.
-  for (const auto& name : (unload_dependents ? deleted_dependents : deleted)) {
-    infos_.erase(name);
-    model_life_cycle_->AsyncUnload(name);
-  }
+    // Write intermediate state
+    infos_.swap(new_infos);
+    dependency_graph_.swap(new_dependency_graph);
+    CopyModelInfos(&new_infos);
+    CopyDependencyGraph(&new_dependency_graph);
+    std::set<std::string> deleted_dependents;
 
-  // load / unload the models affected, and check the load status of
-  // the requested models
-  const auto& load_status = LoadModelByDependency();
-  if (status.IsOk() && (type == ActionType::LOAD)) {
-    std::string load_error_message = "";
-    for (const auto& model : models) {
-      auto it = load_status.find(model.first);
-      // If 'model.first' not in load status, it means the (re-)load is not
-      // necessary because there is no change in the model's directory
-      if ((it != load_status.end()) && !it->second.IsOk()) {
-        load_error_message +=
-            ("load failed for model '" + model.first +
-             "': " + it->second.Message() + "\n");
+    // Update dependency graph and load
+    UpdateDependencyGraph(
+        added, deleted, modified,
+        unload_dependents ? &deleted_dependents : nullptr);
+
+    // The models are in 'deleted' either when they are asked to be unloaded or
+    // they are not found / are duplicated across all model repositories.
+    // In all cases, should unload them and remove from 'infos_' explicitly.
+    for (const auto& name : (unload_dependents ? deleted_dependents : deleted)) {
+      infos_.erase(name);
+      model_life_cycle_->AsyncUnload(name);
+    }
+
+    // load / unload the models affected, and check the load status of
+    // the requested models
+    // KMTODO: LoadModelByDependency() is where the model is loaded.
+    const auto& load_status = LoadModelByDependency();
+    if (status.IsOk() && (type == ActionType::LOAD)) {
+      std::string load_error_message = "";
+      for (const auto& model : models) {
+        auto it = load_status.find(model.first);
+        // If 'model.first' not in load status, it means the (re-)load is not
+        // necessary because there is no change in the model's directory
+        if ((it != load_status.end()) && !it->second.IsOk()) {
+          load_error_message +=
+              ("load failed for model '" + model.first +
+              "': " + it->second.Message() + "\n");
+        }
       }
     }
-    if (!load_error_message.empty()) {
-      status = Status(Status::Code::INVALID_ARG, load_error_message);
-    }
+  } else {
+    // Detected cirteria where we do not have to reload the entire model.
+    AddDeleteModelInstances(model_name)
   }
 
   return status;
+}
+
+void
+ModelRepositoryManager::AddDeleteModelInstances(const std::string &model_name, const int64_t version) {
+  std::shared_ptr<Model> model;
+  Status status = model_life_cycle_->GetModel(model_name, version, &model);
+  if (!status.IsOk()) {
+    LOG_ERROR << "Unable to retrieve model for " << model_name << ", version: ", std::to_string(version)
+    return;
+  }
+
+  
+}
+
+bool
+ModelRepositoryManager::ComputeModelConfigDiff(const inference::ModelConfig& old_config, const inference::ModelConfig& new_config, inference::ModelConfig& diff)
+{
+  //nocheckin
+  LOG_INFO << "BEGINNING COMPUTATION OF MODEL CONFIG DIFFERENCE..." << std::endl;
+  LOG_INFO << old_config.DebugString() << std::endl;
+  LOG_INFO << new_config.DebugString() << std::endl;
+
+  // Start with only checking if the instance group has changed. Then worry about 
+  // hardening that it's the only portion which has changed. Then ensuring that 
+  // all fields of the model config havve been checked.
+  // 
+  // Plan of Attack:
+  // [ ] Return if instance groups are equal
+  // [ ] Check that all fields of the model config are checked and only return TRUE if model
+  //     instances have changed.
+  // [ ] Iterator which checks all fields
+  // [ ] Return bitset which records which fields have changed
+  //
+  //pb_util::MessageDifferencer::Equals(old_config.instance_group(), new_config.instance_group());
+  namespace pb_util = google::protobuf::util;
+  pb_util::MessageDifferencer pb_differencer;
+
+  // Need to get the descriptor for the message containing the field we want to use
+  // then get the FieldDescriptor by name.
+  const google::protobuf::Descriptor* config_descriptor = old_config.descriptor();
+  pb_differencer.TreatAsSet(config_descriptor->FindFieldByName("instance_group"));       // KMTODO: Test what the behavior of this line is when the field is omitted in the config file
+  bool instance_groups_are_equal = pb_differencer.Compare(old_config, new_config);
+
+  //nocheckin
+  LOG_INFO << "END COMPUTATION" << std::endl;
+  return instance_groups_are_equal;
 }
 
 Status
