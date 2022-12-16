@@ -239,10 +239,23 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 		  "If the target system is not Windows 10, please update _WIN32_WINNT "
 		  "to corresponding value.")
   # WAR: set /std since target_compile_features not applying correctly to MSVC.
+  if (MSVC_VERSION GREATER_EQUAL "1900")
+    message("=== MSVC>=1900: ADDING C++17 COMPILE OPTION ===")
+    include(CheckCXXCompilerFlag)
+    CHECK_CXX_COMPILER_FLAG("/std:c++latest" _cpp_latest_flag_supported)
+    if (_cpp_latest_flag_supported)
+        message("=== _cpp_latest_flag_supported TRUE ===")
+        add_compile_options("/std:c++latest")
+    else()
+        message("=== UNEXPECTED _cpp_latest_flag_supported FALSE ===")
+    endif()
+  else()
+    message("=== UNEXPECTED MSVC<1900: NOT ADDING C++17 COMPILE OPTION ===")
+  endif()
   target_compile_options(
     triton-core
     PRIVATE
-      /std:c++17 /W1 /D_WIN32_WINNT=0x0A00 /EHsc
+      /W1 /D_WIN32_WINNT=0x0A00 /EHsc
   )
 else()
   target_compile_options(
