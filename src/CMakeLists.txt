@@ -249,6 +249,13 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     else()
         message("=== UNEXPECTED _cpp_latest_flag_supported FALSE ===")
     endif()
+    
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.12.25835)
+    	set(CMAKE_CXX20_STANDARD_COMPILE_OPTION "-std:c++latest")
+      	set(CMAKE_CXX20_EXTENSION_COMPILE_OPTION "-std:c++latest")
+    endif()
+
+    
   else()
     message("=== UNEXPECTED MSVC<1900: NOT ADDING C++17 COMPILE OPTION ===")
   endif()
