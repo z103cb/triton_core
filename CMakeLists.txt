@@ -28,6 +28,9 @@ cmake_minimum_required(VERSION 3.18)
 
 project(tritoncore LANGUAGES C CXX)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 # Control building of shared library vs. only headers and stub. By
 # default only the headers and library stub is built. Set
 # TRITON_CORE_HEADERS_ONLY=OFF to also build libtritonserver.so.
