@@ -123,7 +123,8 @@ class TritonModel : public Model {
   std::shared_ptr<TritonBackend> backend_;
 
   // The model instances for this model.
-  std::vector<std::unique_ptr<TritonModelInstance>> instances_;
+using TritonInstanceGroup = std::vector<std::unique_ptr<TritonModelInstance>>;
+std::map<std::string, TritonInstanceGroup> instance_group_;
   std::vector<std::unique_ptr<TritonModelInstance>> passive_instances_;
 
   // Opaque state associated with this model.

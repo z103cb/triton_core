@@ -48,11 +48,20 @@ class InferenceRequest;
 //
 class TritonModelInstance {
  public:
+  class TritonBackendThread;
   static Status CreateInstances(
       TritonModel* model,
       const triton::common::BackendCmdlineConfigMap& backend_cmdline_config_map,
       const triton::common::HostPolicyCmdlineConfigMap& host_policy_map,
       const inference::ModelConfig& model_config, const bool device_blocking);
+
+  // Create one instance of this model given a instance_group definition
+  static Status CreateInstance(TritonModel* model,
+      const inference::ModelInstanceGroup& group,
+      const triton::common::BackendCmdlineConfigMap& backend_cmdline_config_map,
+      const triton::common::HostPolicyCmdlineConfigMap& host_policy_map,
+      std::map<int32_t, std::shared_ptr<TritonBackendThread>>& device_to_thread_map,
+      const bool device_blocking, const int32_t c);
   ~TritonModelInstance();
 
   const std::string& Name() const { return name_; }
@@ -69,6 +78,8 @@ class TritonModelInstance {
   }
   bool IsPassive() const { return passive_; }
   const std::vector<std::string>& Profiles() const { return profile_names_; }
+
+  std::shared_ptr<TritonBackendThread> BackendThread() {return triton_backend_thread_; }
 
   struct SecondaryDevice {
     SecondaryDevice(const std::string kind, const int64_t id)
@@ -97,7 +108,6 @@ class TritonModelInstance {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonModelInstance);
-  class TritonBackendThread;
   TritonModelInstance(
       TritonModel* model, const std::string& name, const size_t index,
       const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
@@ -125,6 +135,7 @@ class TritonModelInstance {
 
   void Execute(std::vector<TRITONBACKEND_Request*>& triton_requests);
 
+public:
   class TritonBackendThread {
    public:
     static Status CreateBackendThread(
@@ -148,6 +159,8 @@ class TritonModelInstance {
     std::thread backend_thread_;
     std::atomic<bool> backend_thread_exit_;
   };
+
+private:
   std::shared_ptr<TritonBackendThread> triton_backend_thread_;
 
   struct WarmupData {

@@ -737,4 +737,118 @@ ModelLifeCycle::OnLoadComplete(
   }
 }
 
+void
+ModelLifeCycle::AddDeleteModelInstances(
+  const std::string &model_name,
+  const inference::ModelConfig& model_config) 
+{
+  // Because the instance group API doesn't allow for version specific parameters,
+  // we need to iterate through all versions of the model and update their instances 
+  // accordingly.
+  auto version_map_itr = map_.find(model_name);
+  if (version_map_itr == map_.end()) {
+    LOG_ERROR << "Did not find model name '" << model_name << "' in model map";
+    return;
+  }
+
+  //  Need to iterate through all the versions as there are no version specific
+  // settings for the model instances.
+  auto& version_map = version_map_itr->second;
+  for (auto& model_version : version_map) {
+  // for (auto itr = version_map.begin(); itr != version_map.end(); ++itr){
+    std::unique_ptr<ModelInfo>& current_info = model_version.second;
+
+    // FIXME: This is a risky downcast. All Models are TritonModels except for
+    // Ensemble Models. However, Ensemble Models are not allowed to have instances.
+    // Therefore, we are guaranteed the Model can be downcasted to a TritonModel. 
+    // This will break if there are any other derived Models which use Model
+    // as the Base
+    //
+    // KMTODO: Assert that only TritonModels are allowed here. 
+    TritonModel* raw_triton_model = dynamic_cast<TritonModel*>(current_info->model_.get());
+    if (raw_triton_model == nullptr) {
+      LOG_ERROR << "Unable to downcast Model to TritonModel for model name: " << model_name;
+      return;
+    }
+
+    // Collect everything we need to create and destroy instances.
+    const auto& triton_instance_group_map = raw_triton_model->InstanceGroups();
+    auto& rate_limiter = server_->GetRateLimiter();
+    const triton::common::BackendCmdlineConfigMap& backend_cmdline_config_map = cmdline_config_map_;
+    const triton::common::HostPolicyCmdlineConfigMap& host_policy_map = host_policy_map_;
+    bool device_blocking = false;
+    if (raw_triton_model->backend_->ExecutionPolicy() ==
+        TRITONBACKEND_EXECUTION_DEVICE_BLOCKING) {
+      if (model_config.has_sequence_batching()) {
+        LOG_INFO << "Overriding execution policy to "
+                    "\"TRITONBACKEND_EXECUTION_BLOCKING\" for sequence model \""
+                << model_config.name() << "\"";
+      } else {
+        device_blocking = true;
+      }
+    }
+
+    // Need to rebuild the device_id to BackendThread map since that work was thrown away after
+    // loading the model.
+    std::map<int32_t, std::shared_ptr<TritonBackendThread>> device_to_thread_map;
+    for (const auto& pair : triton_instance_group_map) {
+      for (auto& instance : pair.second) {
+        // Add to the device_id map
+        int32_t device_id = instance.DeviceId();
+        std::shared_ptr<TritonBackendThread> backend_thread = instance.BackendThread();
+        device_to_thread_map.insert({device_id, backend_thread});
+      }
+    }
+
+
+    // For each instance group we must add or remove instances.
+    // Assumption is the instance groups are in the exact same order 
+    // between the old config and the new config. Therefore we should 
+    // be able to pick out the names of the groups from the instance_group_map_
+    for (int32_t instance_group_index = 0; instance_group_index < model_config.instance_group().size(); ++instance_group_index) {
+      const inference::ModelInstanceGroup& instance_group = model_config.instance_group()[instance_group_index];
+      const auto& triton_instance_group = triton_instance_group_map[instance_group.name()];
+
+      // reasonable assumption that there are less than 2^31 instances of a model to prevent underflow.
+      int32_t difference = instance_group.count() - int32_t(triton_instance_group.size());
+
+      if (difference > 0) {
+        // Add instances to the model
+        for (int32_t i = 0; i < difference; ++i){ 
+          int32_t instance_index = triton_model_instances.size() + i;
+
+          // Create the model instance
+          // The BackendThread is created in creation of the instance
+          // This instance gets registered with the rate limiter on creation
+          // Instance gets added to the model on creation.
+          RETURN_IF_ERROR(TritonModelInstance::CreateInstance(
+              model, model_config.instance_group(), backend_cmdlind_config_map, host_policy_map,
+              device_to_thread_map, device_blocking, instance_index));
+        }
+      } else if (difference < 0) {
+        // Remove instances from the model. Leave minimum of 1
+        if ((difference * -1) == int32_t(triton_model_instances.size())) {
+          difference += 1;
+          LOG_INFO << "Difference in instance count equals the number of current instances. " 
+                  << "Incrementing the difference to leave 1 instance running."
+                  << "Number of current instances: " << std::to_string(triton_model_instances.size())
+                  << ", difference: " << std::to_sting(difference);
+        }
+        for (int i = difference; i < 0; ++i) {
+          // BackendThread stops when the TritonModelInstance desturctor is called
+          auto& triton_model_instance = triton_model_instances.back();
+
+          // remove the last one in the list for no reason.
+          // Remove the instance from the model
+          // Backend Thread gets stopped on destruction of the instance.
+          triton_model_instances.erase(triton_model_instances.size()-1);
+
+          // Unregister the TritonModelInstance with the rate_limiter.
+          rate_limiter->UnregisterModelInstace(triton_model_instance.get());
+        }
+      } // else do nothing
+    }
+  }
+}
+
 }}  // namespace triton::core

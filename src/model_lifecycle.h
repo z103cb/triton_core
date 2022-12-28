@@ -159,6 +159,7 @@ class TritonRepoAgentModelList {
 
 class InferenceServer;
 class Model;
+class TritonBackendThread;
 
 class ModelLifeCycle {
  public:
@@ -185,6 +186,12 @@ class ModelLifeCycle {
 
   // Unload model asynchronously.
   Status AsyncUnload(const std::string& model_name);
+
+  /// Using the model name and the new config, add and remove 
+  /// model instances for the given model.
+  void AddDeleteModelInstances(
+      const std::string &model_name,
+      const inference::ModelConfig& model_config);
 
   // Get specified version of the model. Latest ready version will
   // be retrieved if 'version' is -1. Return error if the version specified is
@@ -217,7 +224,7 @@ class ModelLifeCycle {
   // that don't have in-flight inferences will not be included.
   const std::set<std::tuple<std::string, int64_t, size_t>> InflightStatus();
 
- private:
+private: 
   struct ModelInfo {
     ModelInfo(
         const std::string& model_path,
@@ -302,10 +309,10 @@ class ModelLifeCycle {
       ModelInfo* model_info, std::function<void(Status)> OnComplete,
       std::shared_ptr<LoadTracker> load_tracker);
 
-
+  
   // Mutex for 'map_' and 'background_models_'
   std::mutex map_mtx_;
-
+  
   using VersionMap = std::map<int64_t, std::unique_ptr<ModelInfo>>;
   using ModelMap = std::map<std::string, VersionMap>;
   ModelMap map_;

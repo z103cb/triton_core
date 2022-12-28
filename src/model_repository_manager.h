@@ -328,10 +328,6 @@ class ModelRepositoryManager {
   /// \return TRUE if the model instance groups are different; FALSE if they are the same.
   bool ComputeModelConfigDiff(const inference::ModelConfig& old_config, const inference::ModelConfig& new_config, inference::ModelConfig& diff);
 
-  /// Using the model name and the new config, add and remove 
-  /// model instances for the given model.
-  void AddDeleteModelInstances(const std::string &model_name, const int64_t version);
-
   std::set<std::string> repository_paths_;
   const bool autofill_;
   const bool polling_enabled_;

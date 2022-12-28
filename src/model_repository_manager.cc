@@ -614,7 +614,11 @@ ModelRepositoryManager::LoadUnloadModels(
   *all_models_polled = true;
   // Update ModelInfo related to file system accordingly
   std::set<std::string> added, deleted, modified, unmodified;
+  
   bool short_circuit_loading = false;
+  std::string changed_name; //KMTODO: change this to a map
+  std::vector<std::string> mark_for_modified_removal;
+  
   {
     if (type == ActionType::UNLOAD) {
       for (const auto& model : models) {
@@ -672,6 +676,10 @@ ModelRepositoryManager::LoadUnloadModels(
         infos_.emplace(model_name, std::move(nitr->second));
       }
       for (const auto& model_name : modified) {
+        // KMTODO: need to associate each of the bitmaps with the model name. For now assume only one model.
+        changed_name = model_name;
+        mark_for_modified_removal.push_back(model_name);
+
         auto nitr = new_infos.find(model_name);
         auto itr = infos_.find(model_name);
 
@@ -681,89 +689,92 @@ ModelRepositoryManager::LoadUnloadModels(
         // Still swap out the old config with the new config, just store the diff info for 
         // any logic we want to skip down the road.
         //
-        //using ModelInfoMap = std::unordered_map<std::string, std::unique_ptr<ModelInfo>>;
-        // 
-        inference::ModelConfig diff = inference::ModelConfig();
         // If model is an ensemble model, then we are not allowed multiple instances. Do the full model load for 
         // in this case to get the correct error.
+        //
+        // IMPORTANT: Assume we only change the instance count and the instance groups _must_ be in the 
+        // same order as before. Otherwise we must resolve the difference in group identifiers
+        // in the case of instance groups using default naming. Default naming is order dependent in the 
+        // model config file.
+        inference::ModelConfig diff = inference::ModelConfig();
         short_circuit_loading = ComputeModelConfigDiff(itr->second->model_config_, nitr->second->model_config_, diff); 
+        if (short_circuit_loading) {
+          LOG_INFO << "We are going to short circuit the model '" << model_name << "'";
+        }
 
         itr->second = std::move(nitr->second);
       }
     }
   }
+
   // KMTODO: This is where we will check the bitmap for each model 
   // and determine whether to take any short cuts for model loading.
-  if (!short_circuit_loading) {
-    // Update dependency graph and load
-    UpdateDependencyGraph(
-        added, deleted, modified,
-        unload_dependents ? &deleted_dependents : nullptr);
-
-    // The models are in 'deleted' either when they are asked to be unloaded or
-    // they are not found / are duplicated across all model repositories.
-    // In all cases, should unload them and remove from 'infos_' explicitly.
-    for (const auto& name :
-         (unload_dependents ? deleted_dependents : deleted)) {
-      new_infos.erase(name);
-    }
-
-    // Write intermediate state
-    infos_.swap(new_infos);
-    dependency_graph_.swap(new_dependency_graph);
-    CopyModelInfos(&new_infos);
-    CopyDependencyGraph(&new_dependency_graph);
-    std::set<std::string> deleted_dependents;
-
-    // Update dependency graph and load
-    UpdateDependencyGraph(
-        added, deleted, modified,
-        unload_dependents ? &deleted_dependents : nullptr);
-
-    // The models are in 'deleted' either when they are asked to be unloaded or
-    // they are not found / are duplicated across all model repositories.
-    // In all cases, should unload them and remove from 'infos_' explicitly.
-    for (const auto& name : (unload_dependents ? deleted_dependents : deleted)) {
-      infos_.erase(name);
-      model_life_cycle_->AsyncUnload(name);
-    }
-
-    // load / unload the models affected, and check the load status of
-    // the requested models
-    // KMTODO: LoadModelByDependency() is where the model is loaded.
-    const auto& load_status = LoadModelByDependency();
-    if (status.IsOk() && (type == ActionType::LOAD)) {
-      std::string load_error_message = "";
-      for (const auto& model : models) {
-        auto it = load_status.find(model.first);
-        // If 'model.first' not in load status, it means the (re-)load is not
-        // necessary because there is no change in the model's directory
-        if ((it != load_status.end()) && !it->second.IsOk()) {
-          load_error_message +=
-              ("load failed for model '" + model.first +
-              "': " + it->second.Message() + "\n");
-        }
+  if (!mark_for_modified_removal.empty()) {
+    // Remove the short circuits from the normal model loading process
+    for (const auto& model_name : mark_for_modified_removal) {
+      auto itr = modified.find(model_name);
+      if (itr != modified.end()) {
+        modified.erase(itr);
       }
     }
-  } else {
+
+    // Don't need to UpdateDependencyGraph() as the model doesn't need to 
+    // be reloaded.
+    // Don't need to AsyncUnload() as these models are modified and not deleted.
+    // Don't need to LoadModelTypeByDependency() as the model is not being re-loaded.
+    
     // Detected cirteria where we do not have to reload the entire model.
-    AddDeleteModelInstances(model_name)
+    auto& model_info_itr = infos_.find(model_name);
+    if (model_info == infos_.end()){
+      LOG_ERROR << "Unable to find infos for model which we want to modeify instances for.";
+      return Status(Status::Code::INTERNAL);
+    }
+    auto& model_info = model_info_itr.second;
+    model_life_cycle_->AddDeleteModelInstances(changed_name, model_info.model_config);
+  }
+
+  // Do the slow thing for the rest of the models
+  std::set<std::string> deleted_dependents;
+
+  // Update dependency graph and load
+  // KMTODO: This updates all models rather than only the models which 
+  //         don't have a short_circuit.
+  UpdateDependencyGraph(
+      added, deleted, modified,
+      unload_dependents ? &deleted_dependents : nullptr);
+
+  // The models are in 'deleted' either when they are asked to be unloaded or
+  // they are not found / are duplicated across all model repositories.
+  // In all cases, should unload them and remove from 'infos_' explicitly.
+  for (const auto& name : (unload_dependents ? deleted_dependents : deleted)) {
+    infos_.erase(name);
+    model_life_cycle_->AsyncUnload(name);
+  }
+
+  // load / unload the models affected, and check the load status of
+  // the requested models
+  // KMTODO: LoadModelByDependency() is where the model is loaded.
+  const auto& load_status = LoadModelByDependency();
+  if (status.IsOk() && (type == ActionType::LOAD)) {
+    std::string load_error_message = "";
+    for (const auto& model : models) {
+      auto it = load_status.find(model.first);
+      // If 'model.first' not in load status, it means the (re-)load is not
+      // necessary because there is no change in the model's directory
+      if ((it != load_status.end()) && !it->second.IsOk()) {
+        load_error_message +=
+            ("load failed for model '" + model.first +
+            "': " + it->second.Message() + "\n");
+      }
+    }
+    if (!load_error_message.empty()) {
+      status = Status(Status::Code::INVALID_ARG, load_error_message);
+    }
   }
 
   return status;
 }
 
-void
-ModelRepositoryManager::AddDeleteModelInstances(const std::string &model_name, const int64_t version) {
-  std::shared_ptr<Model> model;
-  Status status = model_life_cycle_->GetModel(model_name, version, &model);
-  if (!status.IsOk()) {
-    LOG_ERROR << "Unable to retrieve model for " << model_name << ", version: ", std::to_string(version)
-    return;
-  }
-
-  
-}
 
 bool
 ModelRepositoryManager::ComputeModelConfigDiff(const inference::ModelConfig& old_config, const inference::ModelConfig& new_config, inference::ModelConfig& diff)
@@ -1683,5 +1694,7 @@ ModelRepositoryManager::CheckNode(DependencyNode* node)
   }
   return node_ready;
 }
+
+
 
 }}  // namespace triton::core
