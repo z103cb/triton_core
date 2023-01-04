@@ -36,6 +36,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # TRITON_CORE_HEADERS_ONLY=OFF to also build libtritonserver.so.
 option(TRITON_CORE_HEADERS_ONLY "Build only headers and stub" ON)
 
+if (WIN32)
+  set(CMAKE_CXX_FLAGS "/std:c++17 /permissive-" CACHE INTERNAL "")
+endif()
 
 #
 # Triton Server API
