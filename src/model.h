@@ -111,9 +111,9 @@ class Model {
 
   uint32_t MaxPriorityLevel() const { return max_priority_level_; }
 
- protected:
   // Set the configuration of the model being served.
   Status SetModelConfig(const inference::ModelConfig& config);
+ protected:
 
   // Explicitly set the scheduler to use for inference requests to the
   // model. The scheduler can only be set once for a model.

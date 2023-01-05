@@ -712,25 +712,29 @@ ModelRepositoryManager::LoadUnloadModels(
   if (!mark_for_modified_removal.empty()) {
     // Remove the short circuits from the normal model loading process
     for (const auto& model_name : mark_for_modified_removal) {
+      LOG_INFO << "Working with model: " << model_name;
       auto itr = modified.find(model_name);
       if (itr != modified.end()) {
         modified.erase(itr);
       }
-    }
 
-    // Don't need to UpdateDependencyGraph() as the model doesn't need to 
-    // be reloaded.
-    // Don't need to AsyncUnload() as these models are modified and not deleted.
-    // Don't need to LoadModelTypeByDependency() as the model is not being re-loaded.
-    
-    // Detected cirteria where we do not have to reload the entire model.
-    auto& model_info_itr = infos_.find(model_name);
-    if (model_info == infos_.end()){
-      LOG_ERROR << "Unable to find infos for model which we want to modeify instances for.";
-      return Status(Status::Code::INTERNAL);
+      // Don't need to UpdateDependencyGraph() as the model doesn't need to 
+      // be reloaded.
+      // Don't need to AsyncUnload() as these models are modified and not deleted.
+      // Don't need to LoadModelTypeByDependency() as the model is not being re-loaded.
+      
+      // Detected cirteria where we do not have to reload the entire model.
+      // KMTODO: We should keep the short circuit info in this list.
+      auto model_info_itr = infos_.find(model_name);
+      if (model_info_itr == infos_.end()){
+        LOG_ERROR << "Unable to find infos for model which we want to modeify instances for.";
+        return Status(Status::Code::INTERNAL);
+      }
+      auto& model_info = model_info_itr->second;
+      model_life_cycle_->AddDeleteModelInstances(changed_name, model_info->model_config_);
+
+      // KMTODO: Model config is not getting saved. Need to save the model config
     }
-    auto& model_info = model_info_itr.second;
-    model_life_cycle_->AddDeleteModelInstances(changed_name, model_info.model_config);
   }
 
   // Do the slow thing for the rest of the models

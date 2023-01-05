@@ -288,14 +288,19 @@ TritonModelInstance::CreateInstances(
   return Status::Success;
 }
 
-static Status CreateInstance(TritonModel* model,
+Status 
+TritonModelInstance::CreateOneInstance(TritonModel* model,
       const inference::ModelInstanceGroup& group,
       const triton::common::BackendCmdlineConfigMap& backend_cmdline_config_map,
       const triton::common::HostPolicyCmdlineConfigMap& host_policy_map,
-      std::map<int32_t, std::shared_ptr<TritonBackendThread>>& device_to_thread_map,
+      std::map<uint32_t, std::shared_ptr<TritonBackendThread>>& device_to_thread_map,
       const bool device_blocking, const int32_t c)
 {
   triton::common::HostPolicyCmdlineConfig empty_host_policy;
+  std::vector<std::string> profile_names;
+  for (const auto& profile_name : group.profile()) {
+    profile_names.push_back(profile_name);
+  }
 
   std::vector<SecondaryDevice> secondary_devices;
   for (const auto& secondary_device : group.secondary_devices()) {
@@ -306,10 +311,9 @@ static Status CreateInstance(TritonModel* model,
         secondary_device.device_id());
   }
 
-  //KMTODO: Adding an instance so need to know how many instances there are right now.
-  // std::string instance_name{group.count() > 1
-  //                               ? group.name() + "_" + std::to_string(c)
-  //                               : group.name()};
+  std::string instance_name{group.count() > 1
+                                ? group.name() + "_" + std::to_string(c)
+                                : group.name()};
   const bool passive = group.passive();
   std::vector<std::tuple<
       std::string, TRITONSERVER_InstanceGroupKind, int32_t,
@@ -385,6 +389,8 @@ static Status CreateInstance(TritonModel* model,
     }
   
   }
+
+  return Status::Success;
 }
 
 Status

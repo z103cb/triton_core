@@ -49,19 +49,19 @@ class InferenceRequest;
 class TritonModelInstance {
  public:
   class TritonBackendThread;
+  struct SecondaryDevice;
+  // Create one instance of this model given a instance_group definition
+  static Status CreateOneInstance(TritonModel* model,
+      const inference::ModelInstanceGroup& group,
+      const triton::common::BackendCmdlineConfigMap& backend_cmdline_config_map,
+      const triton::common::HostPolicyCmdlineConfigMap& host_policy_map,
+      std::map<uint32_t, std::shared_ptr<TritonBackendThread>>& device_to_thread_map,
+      const bool device_blocking, const int32_t c);
   static Status CreateInstances(
       TritonModel* model,
       const triton::common::BackendCmdlineConfigMap& backend_cmdline_config_map,
       const triton::common::HostPolicyCmdlineConfigMap& host_policy_map,
       const inference::ModelConfig& model_config, const bool device_blocking);
-
-  // Create one instance of this model given a instance_group definition
-  static Status CreateInstance(TritonModel* model,
-      const inference::ModelInstanceGroup& group,
-      const triton::common::BackendCmdlineConfigMap& backend_cmdline_config_map,
-      const triton::common::HostPolicyCmdlineConfigMap& host_policy_map,
-      std::map<int32_t, std::shared_ptr<TritonBackendThread>>& device_to_thread_map,
-      const bool device_blocking, const int32_t c);
   ~TritonModelInstance();
 
   const std::string& Name() const { return name_; }

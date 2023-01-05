@@ -829,6 +829,7 @@ NormalizeInstanceGroup(
 
     // Set Triton default if the fields are not set from preferred group
     // Count
+    LOG_INFO << config->name() << ": group.count() = " << std::to_string(group.count()); //nocheckin
     if (group.count() < 1) {
       RETURN_IF_ERROR(SetDefaultInstanceCount(&group, config->backend()));
     }

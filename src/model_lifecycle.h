@@ -189,7 +189,7 @@ class ModelLifeCycle {
 
   /// Using the model name and the new config, add and remove 
   /// model instances for the given model.
-  void AddDeleteModelInstances(
+  Status AddDeleteModelInstances(
       const std::string &model_name,
       const inference::ModelConfig& model_config);
 
