@@ -61,7 +61,6 @@ SequenceBatchScheduler::Create(
   for (const auto& pair : model->InstanceGroups()) {
     instance_count += pair.second.size();
   }
-  // auto instance_count = model->Instances().size();
   sched->queue_request_cnts_.resize(instance_count, 0);
 
   auto& config = model->Config();
@@ -141,13 +140,13 @@ SequenceBatchScheduler::Create(
       if (config.sequence_batching().has_oldest()) {
         sb.reset(new OldestSequenceBatch(
             sched.get(), index, seq_slot_cnt, instance.get(),
-            enforce_equal_shape_tensors, has_optional_input, start, end, startend,
-            cont, notready, &init_state));
+            enforce_equal_shape_tensors, has_optional_input, start, end,
+            startend, cont, notready, &init_state));
       } else {
         sb.reset(new DirectSequenceBatch(
             sched.get(), index, seq_slot_cnt, instance.get(),
-            enforce_equal_shape_tensors, has_optional_input, start, end, startend,
-            cont, notready, &init_state));
+            enforce_equal_shape_tensors, has_optional_input, start, end,
+            startend, cont, notready, &init_state));
       }
 
       if (init_state) {

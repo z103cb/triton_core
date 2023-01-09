@@ -1,4 +1,4 @@
-// Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -320,9 +320,11 @@ TritonModel::AddInstance(
 {
   LOG_INFO << "Storing instance under group name: " << instance->GroupName() << ", with name: " << instance->Name();
   if (passive) {
-    passive_instance_group_map_[instance->GroupName()].emplace_back(std::move(instance));
+    passive_instance_group_map_[instance->GroupName()].emplace_back(
+        std::move(instance));
   } else {
-    instance_group_map_[instance->GroupName()].emplace_back(std::move(instance));
+    instance_group_map_[instance->GroupName()].emplace_back(
+        std::move(instance));
   }
 
   return Status::Success;
@@ -435,7 +437,7 @@ TritonModel::SetConfiguredScheduler()
 Status
 TritonModel::Initialize()
 {
-  for (const auto&  pair : instance_group_map_) {
+  for (const auto& pair : instance_group_map_) {
     for (const auto& instance : pair.second) {
       RETURN_IF_ERROR(instance->Initialize());
     }
