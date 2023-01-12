@@ -678,7 +678,7 @@ ModelRepositoryManager::LoadUnloadModels(
       for (const auto& model_name : modified) {
         // KMTODO: need to associate each of the bitmaps with the model name. For now assume only one model.
         changed_name = model_name;
-        mark_for_modified_removal.push_back(model_name);
+        mark_for_modified_removal.push_back(model_name); // this needs to be conditional on short_circuit_loading
 
         auto nitr = new_infos.find(model_name);
         auto itr = infos_.find(model_name);
@@ -700,6 +700,8 @@ ModelRepositoryManager::LoadUnloadModels(
         short_circuit_loading = ComputeModelConfigDiff(itr->second->model_config_, nitr->second->model_config_, diff); 
         if (short_circuit_loading) {
           LOG_INFO << "We are going to short circuit the model '" << model_name << "'";
+        } else {
+          LOG_INFO << "We are NOT going to short circuit the model '" << model_name << "'";
         }
 
         itr->second = std::move(nitr->second);

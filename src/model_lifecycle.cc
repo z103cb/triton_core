@@ -761,8 +761,16 @@ ModelLifeCycle::AddDeleteModelInstances(
   // settings for the model instances.
   auto& version_map = version_map_itr->second;
   for (auto& model_version : version_map) {
-  // for (auto itr = version_map.begin(); itr != version_map.end(); ++itr){
+    // This version of the model didn't load and we detected a short
+    // circuit. Therefore the user hasn't provided anything which 
+    // would change the state of the model failure. Skip this model version.
     std::unique_ptr<ModelInfo>& current_info = model_version.second;
+    if (current_info->state_ != triton::core::ModelReadyState::READY) {
+      LOG_INFO << "Not modifying the model instances for model '" << model_name << "' version '"
+                << std::to_string(model_version.first) << "' due to state " << ModelReadyStateString(current_info->state_)
+                << " with reason: " << current_info->state_reason_;
+      continue;
+    }
 
     // FIXME: This is a risky downcast. All Models are TritonModels except for
     // Ensemble Models. However, Ensemble Models are not allowed to have instances.
@@ -868,26 +876,37 @@ ModelLifeCycle::AddDeleteModelInstances(
         }
       } else if (difference < 0) {
         // Remove instances from the model. Leave minimum of 1
-        if ((difference * -1) == int32_t(triton_instance_group.size())) {
-          difference += 1;
-          LOG_INFO << "Difference in instance count equals the number of current instances. " 
+        if ((difference * -1) >= int32_t(triton_instance_group.size())) {
+          difference = int32_t(triton_instance_group.size()) - 1;
+          difference *= -1;
+          LOG_INFO << "Difference in instance count greater than or equals the number of current instances. " 
                   << "Incrementing the difference to leave 1 instance running."
                   << "Number of current instances: " << std::to_string(triton_instance_group.size())
                   << ", difference: " << std::to_string(difference);
+
+          // Need to update the config as well 
+          // INCONSISTENT: The model config on the model_infos is const and 
+          // apparently at this point we have already updated the model 
+          // config on the TritonModel, so modifying here works.
+          inference::ModelConfig& triton_model_config = raw_triton_model->MutableConfig();
+          google::protobuf::RepeatedPtrField< inference::ModelInstanceGroup >* group_repeated_ptr_ptr = triton_model_config.mutable_instance_group();
+          inference::ModelInstanceGroup* triton_model_instance_group = group_repeated_ptr_ptr->Mutable(instance_group_index);
+          triton_model_instance_group->set_count(1);
         }
         for (int i = difference; i < 0; ++i) {
           LOG_INFO << "Removing instance as index " << std::to_string(i);
           // BackendThread stops when the TritonModelInstance desturctor is called
           auto& triton_model_instance = triton_instance_group.back();
 
+          // Unregister the TritonModelInstance with the rate_limiter.
+          LOG_INFO << "Unregistering model instance from rate_limiter";
+          rate_limiter->UnregisterModelInstance(triton_model_instance.get());
+ 
           // remove the last one in the list for no reason.
           // Remove the instance from the model
           // Backend Thread gets stopped on destruction of the instance.
           triton_instance_group.erase(triton_instance_group.end()-1);
 
-          // Unregister the TritonModelInstance with the rate_limiter.
-          LOG_INFO << "Unregistering model instance from rate_limiter";
-          rate_limiter->UnregisterModelInstance(triton_model_instance.get());
         }
       } // else do nothing
     }

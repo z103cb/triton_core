@@ -358,7 +358,7 @@ TritonModelInstance::CreateOneInstance(TritonModel* model,
     }
     RETURN_IF_ERROR(SetNumaConfigOnThread(*host_policy));
     auto err = CreateInstance(
-        model, instance_name, c, kind, id, profile_names, passive,
+        model, instance_name, group.name(), c, kind, id, profile_names, passive,
         policy_name, *host_policy, *(std::get<3>(is)), device_blocking,
         &device_to_thread_map, secondary_devices);
     RETURN_IF_ERROR(ResetNumaMemoryPolicy());

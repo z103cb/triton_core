@@ -59,6 +59,9 @@ class Model {
   // Get the configuration of model being served.
   const inference::ModelConfig& Config() const { return config_; }
 
+  // Get the configuration of model being served.
+  inference::ModelConfig& MutableConfig() { return config_; }
+
   // Get the number of required inputs
   size_t RequiredInputCount() const { return required_input_count_; }
 
