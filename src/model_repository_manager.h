@@ -198,13 +198,16 @@ class ModelRepositoryManager {
   /// \return error status
   Status UnregisterModelRepository(const std::string& repository);
 
+  const uint32_t SC_OTHER_FIELD    = 1 << 0;
+  const uint32_t SC_INSTANCE_COUNT = 1 << 1;
+  
   /// Compute the difference between two model configurations. 
   /// \param old_config The first model configuration.
   /// \param new_config The second model configuration.
   /// \param diff The resulting difference from the computation, fields 
   /// which are not empty are populated with the new_config.
   /// \return TRUE if the model instance groups are different; FALSE if they are the same.
-  bool ComputeModelConfigDiff(const inference::ModelConfig& old_config, const inference::ModelConfig& new_config, inference::ModelConfig& diff);
+  uint32_t ComputeModelConfigDiff(const inference::ModelConfig& old_config, const inference::ModelConfig& new_config, inference::ModelConfig& diff);
 
  private:
   struct ModelInfo;

@@ -615,9 +615,7 @@ ModelRepositoryManager::LoadUnloadModels(
   // Update ModelInfo related to file system accordingly
   std::set<std::string> added, deleted, modified, unmodified;
   
-  bool short_circuit_loading = false;
-  std::string changed_name; //KMTODO: change this to a map
-  std::vector<std::string> mark_for_modified_removal;
+  std::vector<std::pair<std::string, uint32_t>> mark_for_modified_removal;
   
   {
     if (type == ActionType::UNLOAD) {
@@ -677,9 +675,6 @@ ModelRepositoryManager::LoadUnloadModels(
       }
       for (const auto& model_name : modified) {
         // KMTODO: need to associate each of the bitmaps with the model name. For now assume only one model.
-        changed_name = model_name;
-        mark_for_modified_removal.push_back(model_name); // this needs to be conditional on short_circuit_loading
-
         auto nitr = new_infos.find(model_name);
         auto itr = infos_.find(model_name);
 
@@ -697,9 +692,14 @@ ModelRepositoryManager::LoadUnloadModels(
         // in the case of instance groups using default naming. Default naming is order dependent in the 
         // model config file.
         inference::ModelConfig diff = inference::ModelConfig();
-        short_circuit_loading = ComputeModelConfigDiff(itr->second->model_config_, nitr->second->model_config_, diff); 
-        if (short_circuit_loading) {
+        uint32_t short_circuit_flags = ComputeModelConfigDiff(itr->second->model_config_, nitr->second->model_config_, diff); 
+
+        // If any of the other flags are set AND SC_OTHER_FIELD is NOT set, then add it to the list
+        uint32_t any_sc_flags_are_set = (short_circuit_flags & !SC_OTHER_FIELD) != 0;
+        uint32_t other_fields_changed = short_circuit_flags & SC_OTHER_FIELD;
+        if (any_sc_flags_are_set && !other_fields_changed) {
           LOG_INFO << "We are going to short circuit the model '" << model_name << "'";
+          mark_for_modified_removal.push_back(std::make_pair(model_name, short_circuit_flags)); 
         } else {
           LOG_INFO << "We are NOT going to short circuit the model '" << model_name << "'";
         }
@@ -711,11 +711,14 @@ ModelRepositoryManager::LoadUnloadModels(
 
   // KMTODO: This is where we will check the bitmap for each model 
   // and determine whether to take any short cuts for model loading.
+  // Update: We can check at the time of diffing the configs to add thismodel to
+  // the mark_for_modified_removal list. If it's not in there then we don't
+  // process it.
   if (!mark_for_modified_removal.empty()) {
     // Remove the short circuits from the normal model loading process
-    for (const auto& model_name : mark_for_modified_removal) {
-      LOG_INFO << "Working with model: " << model_name;
-      auto itr = modified.find(model_name);
+    for (const auto& name_flags_pair : mark_for_modified_removal) {
+      LOG_INFO << "Working with model: " << name_flags_pair.first;
+      auto itr = modified.find( name_flags_pair.first);
       if (itr != modified.end()) {
         modified.erase(itr);
       }
@@ -727,13 +730,15 @@ ModelRepositoryManager::LoadUnloadModels(
       
       // Detected cirteria where we do not have to reload the entire model.
       // KMTODO: We should keep the short circuit info in this list.
-      auto model_info_itr = infos_.find(model_name);
+      auto model_info_itr = infos_.find( name_flags_pair.first);
       if (model_info_itr == infos_.end()){
         LOG_ERROR << "Unable to find infos for model which we want to modeify instances for.";
         return Status(Status::Code::INTERNAL);
       }
       auto& model_info = model_info_itr->second;
-      model_life_cycle_->AddDeleteModelInstances(changed_name, model_info->model_config_);
+      if (name_flags_pair.second & SC_INSTANCE_COUNT) {
+        model_life_cycle_->AddDeleteModelInstances(name_flags_pair.first, model_info->model_config_);
+      }
 
       // KMTODO: Model config is not getting saved. Need to save the model config
     }
