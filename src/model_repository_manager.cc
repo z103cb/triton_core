@@ -823,12 +823,13 @@ ModelRepositoryManager::ComputeModelConfigDiff(const inference::ModelConfig& old
   uint32_t result = 0;
   std::string diff_report;
   {
+    // StreamReporter doesn't flush until the object is destoyed. 
+    // It is not safe to access the contents of the std::string 
+    // until this occurs.
     google::protobuf::io::StringOutputStream output_stream(&diff_report);
     pb_util::MessageDifferencer::StreamReporter pb_reporter(&output_stream);
-    pb_reporter.set_report_modified_aggregates(false);
-    // pb_differencer.ReportDifferencesToString(&diff_report);
     pb_differencer.ReportDifferencesTo(&pb_reporter);
-    pb_differencer.Compare(old_config, new_config);
+    pb_differencer.Comparke(old_config, new_config);
   }
   // LOG_INFO << "Differences reported by protobuf for model_config: " << diff_report;
   LOG_INFO << "Differences reported by protobuf for model_config: " << diff_report;
