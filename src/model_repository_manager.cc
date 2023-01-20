@@ -822,6 +822,7 @@ ModelRepositoryManager::ComputeModelConfigDiff(const inference::ModelConfig& old
 
   uint32_t result = 0;
   std::string diff_report;
+  diff_report.clear();
 
   google::protobuf::io::StringOutputStream output_stream(&diff_report);
   pb_util::MessageDifferencer::StreamReporter pb_reporter(&output_stream);
