@@ -825,7 +825,7 @@ ModelRepositoryManager::ComputeModelConfigDiff(const inference::ModelConfig& old
   {
     google::protobuf::io::StringOutputStream output_stream(&diff_report);
     pb_util::MessageDifferencer::StreamReporter pb_reporter(&output_stream);
-    pb_reporter.set_report_modified_aggregates(true);
+    pb_reporter.set_report_modified_aggregates(false);
     // pb_differencer.ReportDifferencesToString(&diff_report);
     pb_differencer.ReportDifferencesTo(&pb_reporter);
     pb_differencer.Compare(old_config, new_config);
