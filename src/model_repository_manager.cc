@@ -823,10 +823,13 @@ ModelRepositoryManager::ComputeModelConfigDiff(const inference::ModelConfig& old
   uint32_t result = 0;
   std::string diff_report;
   pb_differencer.ReportDifferencesToString(&diff_report);
-  if (!pb_differencer.Compare(old_config, new_config)) {
-    
+  if (!pb_differencer.Compare(old_config.instance_group(), new_config.instance_group())) {
     result |= SC_INSTANCE_COUNT;
   }
+  LOG_INFO << "Differences reported by protobuf for instance_group: " << diff_report;
+
+  diff_report.clear();
+  if ()
 
   //nocheckin
   LOG_INFO << "END COMPUTATION" << std::endl;
