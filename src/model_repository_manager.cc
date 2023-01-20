@@ -787,7 +787,7 @@ ModelRepositoryManager::LoadUnloadModels(
 }
 
 
-bool
+uint32_t
 ModelRepositoryManager::ComputeModelConfigDiff(const inference::ModelConfig& old_config, const inference::ModelConfig& new_config, inference::ModelConfig& diff)
 {
   //nocheckin
@@ -814,11 +814,23 @@ ModelRepositoryManager::ComputeModelConfigDiff(const inference::ModelConfig& old
   // then get the FieldDescriptor by name.
   const google::protobuf::Descriptor* config_descriptor = old_config.descriptor();
   pb_differencer.TreatAsSet(config_descriptor->FindFieldByName("instance_group"));       // KMTODO: Test what the behavior of this line is when the field is omitted in the config file
-  bool instance_groups_are_equal = pb_differencer.Compare(old_config, new_config);
+  pb_differencer.TreatAsSet(config_descriptor->FindFieldByName("input"));
+  pb_differencer.TreatAsSet(config_descriptor->FindFieldByName("output"));
+  pb_differencer.TreatAsSet(config_descriptor->FindFieldByName("batch_input"));
+  pb_differencer.TreatAsSet(config_descriptor->FindFieldByName("batch_output"));
+  pb_differencer.TreatAsSet(config_descriptor->FindFieldByName("model_warmup"));
+
+  uint32_t result = 0;
+  std::string diff_report;
+  pb_differencer.ReportDifferencesToString(&diff_report)
+  if (!pb_differencer.Compare(old_config, new_config)) {
+    
+    result |= SC_INSTANCE_COUNT;
+  }
 
   //nocheckin
   LOG_INFO << "END COMPUTATION" << std::endl;
-  return instance_groups_are_equal;
+  return result;
 }
 
 Status
