@@ -823,13 +823,31 @@ ModelRepositoryManager::ComputeModelConfigDiff(const inference::ModelConfig& old
   uint32_t result = 0;
   std::string diff_report;
   pb_differencer.ReportDifferencesToString(&diff_report);
+  pb_differencer.Compare(old_config, new_config);
+  LOG_INFO << "Differences reported by protobuf for model_config: " << diff_report;
+
+  diff_report.clear();
   if (!pb_differencer.Compare(old_config.instance_group(), new_config.instance_group())) {
     result |= SC_INSTANCE_COUNT;
   }
   LOG_INFO << "Differences reported by protobuf for instance_group: " << diff_report;
 
-  diff_report.clear();
-  if ()
+  // diff_report.clear();
+  // if (old_config.name() != new_config.name()
+  //     || old_config.platform() != new_config.platform()
+  //     || old_config.backend() != new_config.backend()
+  //     || pb_differencer.Compare(old_config.version_policy(), new_config.version_policy())
+  //     || pb_differencer.Compare(old_config.input(), new_config.input())
+  //     || pb_differencer.Compare(old_config.output(), new_config.output())
+  //     || pb_differencer.Compare(old_config.batch_input(), new_config.batch_input())
+  //     || pb_differencer.Compare(old_config.optimization(), new_config.optimization())
+  //     || old_config.scheduling_choice() != new_config.scheduling_choice()
+  //     || old_config.default_model_filename() != new_config.default_model_filename()
+  //     || pb_differencer.Compare(old_config.cc_model_filenames(), new_config.cc_model_filenames())
+  //     || pb_differencer.Compare(old_config.metric_tags(), new_config.metric_tags())
+  //     || pb_differencer.Compare(old_config.parameters(), new_config.parameters())
+  //     )
+
 
   //nocheckin
   LOG_INFO << "END COMPUTATION" << std::endl;
