@@ -822,8 +822,13 @@ ModelRepositoryManager::ComputeModelConfigDiff(const inference::ModelConfig& old
 
   uint32_t result = 0;
   std::string diff_report;
-  pb_differencer.ReportDifferencesToString(&diff_report);
+  pb_util::MessageDifferencer::StreamReporter pb_reporter;
+  pb_reporter.set_report_modified_aggregates(true);
+  // pb_differencer.ReportDifferencesToString(&diff_report);
+  pb_differencer.ReportDifferencesTo(pb_reporter);
   pb_differencer.Compare(old_config, new_config);
+  // LOG_INFO << "Differences reported by protobuf for model_config: " << diff_report;
+  pb_reporter.Print(diff_report);
   LOG_INFO << "Differences reported by protobuf for model_config: " << diff_report;
 
   diff_report.clear();
