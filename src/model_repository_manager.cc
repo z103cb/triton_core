@@ -827,10 +827,10 @@ ModelRepositoryManager::ComputeModelConfigDiff(const inference::ModelConfig& old
   LOG_INFO << "Differences reported by protobuf for model_config: " << diff_report;
 
   diff_report.clear();
-  if (!pb_differencer.Compare(old_config.instance_group(), new_config.instance_group())) {
-    result |= SC_INSTANCE_COUNT;
-  }
-  LOG_INFO << "Differences reported by protobuf for instance_group: " << diff_report;
+  // if (!pb_differencer.Compare(old_config.instance_group(), new_config.instance_group())) {
+  //   result |= SC_INSTANCE_COUNT;
+  // }
+  // LOG_INFO << "Differences reported by protobuf for instance_group: " << diff_report;
 
   // diff_report.clear();
   // if (old_config.name() != new_config.name()
