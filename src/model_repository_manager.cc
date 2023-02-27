@@ -829,7 +829,7 @@ ModelRepositoryManager::ComputeModelConfigDiff(const inference::ModelConfig& old
     google::protobuf::io::StringOutputStream output_stream(&diff_report);
     pb_util::MessageDifferencer::StreamReporter pb_reporter(&output_stream);
     pb_differencer.ReportDifferencesTo(&pb_reporter);
-    pb_differencer.Comparke(old_config, new_config);
+    pb_differencer.Compare(old_config, new_config);
   }
   // LOG_INFO << "Differences reported by protobuf for model_config: " << diff_report;
   LOG_INFO << "Differences reported by protobuf for model_config: " << std::endl << diff_report;
