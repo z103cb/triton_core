@@ -530,16 +530,6 @@ if(${TRITON_ENABLE_METRICS_GPU})
   )
 endif() # TRITON_ENABLE_METRICS_GPU
 
-if (NOT WIN32)
-  if(${TRITON_ENABLE_TRACING})
-    target_link_libraries(
-      triton-core
-      PRIVATE
-        ${OPENTELEMETRY_CPP_LIBRARIES}
-    )
-  endif()
-endif()
-
 install(
   TARGETS
     triton-core
