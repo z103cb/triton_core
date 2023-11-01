@@ -35,7 +35,10 @@ GenerativeSequencer::RescheduleRequest(
   if (flags & TRITONSERVER_REQUEST_RELEASE_RESCHEDULE) {
     // set flags to be not START and not END
     request->SetFlags(0);
-    base_->Enqueue(request);
+    auto error = base_->Enqueue(request);
+    if (!error.IsOk()) {
+      LOG_ERROR << "Failed to reschedule request: " << error.Message();
+    }
   }
   // If not reschedule, use request cancellation to release sequence
   // resources. Check RELEASE_ALL flag to break the recursive calls if
