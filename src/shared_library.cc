@@ -179,11 +179,11 @@ SharedLibrary::CloseLibraryHandle(void* handle)
           Status::Code::INTERNAL, "unable to unload shared library: " + errstr);
     }
 #else
-    if (dlclose(handle) != 0) {
-      return Status(
-          Status::Code::INTERNAL,
-          "unable to unload shared library: " + std::string(dlerror()));
-    }
+    //if (dlclose(handle) != 0) {
+    //  return Status(
+    //      Status::Code::INTERNAL,
+    //      "unable to unload shared library: " + std::string(dlerror()));
+    //}
 #endif
   }
 
