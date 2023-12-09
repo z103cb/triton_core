@@ -1414,7 +1414,7 @@ ModelRepositoryManager::InitializeModelInfo(
       // When override happens, set 'mtime_nsec_' to minimum value so that
       // the next load without override will trigger re-load to undo
       // the override while the local files may still be unchanged.
-      linfo->mtime_nsec_ = std::make_pair(0, 0);
+      //linfo->mtime_nsec_ = std::make_pair(0, 0);
       unmodified = false;
 
       const std::string& override_config = override_parameter->ValueString();
