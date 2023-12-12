@@ -208,7 +208,7 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
   include(FetchContent)
   FetchContent_Declare(
     repo-third-party
-    GIT_REPOSITORY https://github.com/triton-inference-server/third_party.git
+    GIT_REPOSITORY  https://github.com/z103cb/triton_third_party.git
     GIT_TAG ${TRITON_THIRD_PARTY_REPO_TAG}
   )
   FetchContent_MakeAvailable(repo-third-party)
@@ -223,6 +223,8 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
     message(STATUS "Distro Name: ${DISTRO}")
     if(DISTRO MATCHES "CentOS.*")
       set (LIB_DIR "lib64")
+    elseif(DISTRO MATCHES "Red Hat Enterprise Linux")
+      set (LIB_DIR "lib64")      
     endif()
   endif()
 
@@ -230,6 +232,7 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
   # correct dependencies between Triton shared library components and
   # the ExternalProject dependencies (found in the third_party repo)
   include(ExternalProject)
+  include(GNUInstallDirs)
 
   # If CMAKE_TOOLCHAIN_FILE is set, propagate that hint path to the external
   # projects.
