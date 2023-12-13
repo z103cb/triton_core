@@ -277,8 +277,8 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
     set(TRITON_DEPENDS ${TRITON_DEPENDS} aws-sdk-cpp)
     # Add where to find all S3 dependencies to CMAKE_PREFIX_PATH
     set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH}
-      ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake
-      ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib)
+      ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/cmake
+      ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR})
   endif() # TRITON_ENABLE_S3
   if(${TRITON_ENABLE_AZURE_STORAGE})
     set(TRITON_DEPENDS ${TRITON_DEPENDS} azure-sdk)
@@ -305,7 +305,7 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
       ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
       ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
       -DGTEST_ROOT:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/googletest
-      -DgRPC_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/grpc/lib/cmake/grpc
+      -DgRPC_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/grpc/${LIB_DIR}/cmake/grpc
       -Dc-ares_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/c-ares/${LIB_DIR}/cmake/c-ares
       -Dabsl_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/absl/${LIB_DIR}/cmake/absl
       -Dnlohmann_json_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/nlohmann_json/${LIB_DIR}/cmake/nlohmann_json
