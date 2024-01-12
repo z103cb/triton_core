@@ -210,7 +210,7 @@ FileSystemManager::GetFileSystem(
   if (cred_status.IsOk() ||
       cred_status.StatusCode() == Status::Code::ALREADY_EXISTS) {
     // Find credential
-    size_t idx;
+    size_t idx = 0;
     const Status& match_status = GetLongestMatchingNameIndex(cache, path, idx);
     if (!match_status.IsOk()) {
       return ReturnErrorOrReload<CacheType, CredentialType, FileSystemType>(
